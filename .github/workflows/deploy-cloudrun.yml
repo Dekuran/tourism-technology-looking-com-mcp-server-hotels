@@ -41,12 +41,13 @@ jobs:
           # Show active account for debugging (will not expose secrets)
           gcloud auth list
 
-      - name: Ensure Artifact Registry repository
+      # We skip creating the Artifact Registry repo in CI to avoid requiring 'artifactregistry.repositories.create'.
+      # Pre-create the repo once (locally or via console) and grant the SA writer access.
+      - name: Check Artifact Registry repository (no-create)
         run: |
-          gcloud artifacts repositories describe "$GAR_REPO" --location="$REGION" >/dev/null 2>&1 || \
-          gcloud artifacts repositories create "$GAR_REPO" \
-            --repository-format=docker \
-            --location="$REGION"
+          gcloud artifacts repositories describe "$GAR_REPO" --location="$REGION" >/dev/null 2>&1 \
+            && echo "Artifact Registry repo '$GAR_REPO' exists in $REGION." \
+            || echo "Repo '$GAR_REPO' not found or not accessible; skipping creation (pre-create manually)."
 
       - name: Configure Docker auth for Artifact Registry
         run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
