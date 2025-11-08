@@ -163,6 +163,62 @@ else
 fi
 add_md
 
+# AI Agent View via public meta endpoint
+hr
+info "Fetching AI Agent View from /mcp/capcorn/meta ..."
+add_md "## AI Agent View (from /mcp/capcorn/meta)"
+add_md
+META_URL="${CLOUDRUN_URL}/mcp/capcorn/meta"
+META_JSON="${TMP_DIR}/server_meta_remote.json"
+set +e
+HTTP_STATUS_META="$(curl -sS -m 20 -o "$META_JSON" -w '%{http_code}' "$META_URL" || true)"
+set -e
+add_md "- URL: ${META_URL}"
+add_md "- HTTP Status: ${HTTP_STATUS_META}"
+if [[ -s "$META_JSON" ]]; then
+  if command -v jq >/dev/null 2>&1; then
+    INSTRUCTIONS="$(jq -r '.instructions' "$META_JSON" 2>/dev/null || cat "$META_JSON")"
+    NAME="$(jq -r '.name // empty' "$META_JSON" 2>/dev/null || echo "")"
+    VERSION="$(jq -r '.version // empty' "$META_JSON" 2>/dev/null || echo "")"
+  else
+    INSTRUCTIONS="$(cat "$META_JSON")"
+    NAME=""
+    VERSION=""
+  fi
+  if [[ -n "$NAME" || -n "$VERSION" ]]; then
+    add_md "- Server: ${NAME:-N/A} ${VERSION:+(v${VERSION})}"
+  fi
+  add_md "### Server Instructions"
+  if command -v head >/dev/null 2>&1; then
+    printf "%s" "$INSTRUCTIONS" | head -n 300 > "${TMP_DIR}/instructions_remote.txt"
+    add_md_code "markdown" "$(cat "${TMP_DIR}/instructions_remote.txt")"
+  else
+    add_md_code "markdown" "$INSTRUCTIONS"
+  fi
+  add_md
+  add_md "### Registered Tools"
+  if command -v jq >/dev/null 2>&1; then
+    TOOL_COUNT="$(jq '.tools | length' "$META_JSON" 2>/dev/null || echo 0)"
+    add_md "- Count: ${TOOL_COUNT}"
+    add_md
+    for i in $(seq 0 $((TOOL_COUNT-1))); do
+      CLS="$(jq -r ".tools[$i].class" "$META_JSON" 2>/dev/null || echo "")"
+      DESC="$(jq -r ".tools[$i].description" "$META_JSON" 2>/dev/null || echo "")"
+      add_md "- ${CLS}"
+      if [[ -n "$DESC" && "$DESC" != "null" ]]; then
+        add_md_code "markdown" "$DESC"
+      fi
+      add_md
+    done
+  else
+    add_md "_jq not available; dumping raw JSON:_"
+    add_md_code "json" "$(cat "$META_JSON")"
+  fi
+else
+  add_md "⚠ Unable to retrieve meta JSON."
+fi
+add_md
+
 # Optional upstream CapCorn API smoke checks (against upstream, not Cloud Run)
 if [[ -n "${CAPCORN_BASE_URL:-}" ]]; then
   hr
