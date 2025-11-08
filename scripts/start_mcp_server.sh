@@ -128,8 +128,7 @@ if [[ -f .mcp_server.pid ]]; then
       success "Server already running (PID $PID)."
       echo "URL: http://127.0.0.1:$PORT"
       echo "Endpoints:"
-      echo " - Tourism: http://127.0.0.1:$PORT/mcp/tourism"
-      echo " - DSAPI:   http://127.0.0.1:$PORT/mcp/dsapi"
+      echo " - CapCorn: http://127.0.0.1:$PORT/mcp/capcorn"
       exit 0
     fi
   fi
@@ -152,8 +151,7 @@ for i in $(seq 1 "$ATTEMPTS"); do
     success "Server is reachable (HTTP $HTTP_CODE) at http://127.0.0.1:$PORT"
     echo
     echo "Endpoints:"
-    echo " - Tourism: http://127.0.0.1:$PORT/mcp/tourism"
-    echo " - DSAPI:   http://127.0.0.1:$PORT/mcp/dsapi"
+    echo " - CapCorn: http://127.0.0.1:$PORT/mcp/capcorn"
     exit 0
   fi
   sleep 1

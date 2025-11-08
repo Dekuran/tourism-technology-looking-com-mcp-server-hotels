@@ -86,4 +86,17 @@ return [
         'password' => env('DSAPI_PASSWORD'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | CapCorn API
+    |--------------------------------------------------------------------------
+    |
+    | Base URL for the CapCorn API (hotel availability, direct availability,
+    | and reservation endpoints exposed by our CapCornServer tools).
+    |
+    */
+    'capcorn' => [
+        'base_url' => env('CAPCORN_BASE_URL', 'http://localhost:9001'),
+    ],
+
 ];

@@ -133,7 +133,7 @@ if [[ ! -f .env ]]; then
     cp .env.example .env
   else
     cat > .env <<'EOF'
-APP_NAME="Tourism MCP Server"
+APP_NAME="CapCorn MCP Server"
 APP_ENV=local
 APP_DEBUG=true
 APP_KEY=
@@ -232,18 +232,17 @@ info "Testing HTTP endpoints..."
 add_md "## Endpoint Checks"
 add_md
 test_endpoint "/"
-test_endpoint "/mcp/tourism"
-test_endpoint "/mcp/dsapi"
+test_endpoint "/mcp/capcorn"
 
 # MCP Inspector snippet
 hr
-info "Probing MCP Inspector (php artisan mcp:inspector mcp/tourism) ..."
+info "Probing MCP Inspector (php artisan mcp:inspector mcp/capcorn) ..."
 add_md "## MCP Inspector Output (snippet)"
 add_md
 INSPECT_OUT="${TMP_DIR}/inspector.txt"
 # Run inspector briefly and capture output, then terminate
 set +e
-php artisan mcp:inspector mcp/tourism > "$INSPECT_OUT" 2>&1 &
+php artisan mcp:inspector mcp/capcorn > "$INSPECT_OUT" 2>&1 &
 INSPECT_PID=$!
 sleep 3
 if ps -p "$INSPECT_PID" >/dev/null 2>&1; then
@@ -257,6 +256,129 @@ if [[ -s "$INSPECT_OUT" ]]; then
 else
   add_md "⚠ Inspector produced no output."
   warn "Inspector produced no output."
+fi
+add_md
+
+# AI Agent View — server instructions and tools (via reflection)
+hr
+info "Extracting CapCorn server instructions and tools (AI Agent View)..."
+add_md "## AI Agent View"
+add_md
+SERVER_META_PHP="${TMP_DIR}/server_meta.php"
+cat > "$SERVER_META_PHP" <<'PHP'
+<?php
+// Bootstrap Laravel
+require __DIR__ . '/../vendor/autoload.php';
+$app = require __DIR__ . '/../bootstrap/app.php';
+$kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+$kernel->bootstrap();
+
+$fqcn = \App\Mcp\CapCornServer\CapCornServer::class;
+$server = app($fqcn);
+
+$prop = static function(object $obj, string $name) {
+    $rp = new ReflectionProperty($obj, $name);
+    $rp->setAccessible(true);
+    return $rp->getValue($obj);
+};
+
+$instructions = $prop($server, 'instructions');
+$toolClasses = $prop($server, 'tools') ?? [];
+
+$tools = [];
+foreach ($toolClasses as $toolClass) {
+    $desc = null;
+    try {
+        $trc = new ReflectionClass($toolClass);
+        if ($trc->hasProperty('description')) {
+            $rp = $trc->getProperty('description');
+            $rp->setAccessible(true);
+            // Try instantiate without constructor to access default description
+            $inst = $trc->newInstanceWithoutConstructor();
+            $desc = $rp->getValue($inst);
+        }
+    } catch (\Throwable $e) {
+        $desc = null;
+    }
+    $tools[] = [
+        'class' => $toolClass,
+        'description' => $desc,
+    ];
+}
+
+echo json_encode([
+    'server' => $fqcn,
+    'instructions' => $instructions,
+    'tools' => $tools,
+], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+PHP
+
+META_JSON="${TMP_DIR}/server_meta.json"
+php "$SERVER_META_PHP" > "$META_JSON" 2>/dev/null || true
+if [[ -s "$META_JSON" ]]; then
+  if command -v jq >/dev/null 2>&1; then
+    INSTRUCTIONS="$(jq -r '.instructions' "$META_JSON" 2>/dev/null || cat "$META_JSON")"
+  else
+    INSTRUCTIONS="$(cat "$META_JSON")"
+  fi
+  add_md "### Server Instructions"
+  if command -v head >/dev/null 2>&1; then
+    printf "%s" "$INSTRUCTIONS" | head -n 400 > "${TMP_DIR}/instructions.txt"
+    add_md_code "markdown" "$(cat "${TMP_DIR}/instructions.txt")"
+  else
+    add_md_code "markdown" "$INSTRUCTIONS"
+  fi
+  add_md
+  add_md "### Registered Tools"
+  if command -v jq >/dev/null 2>&1; then
+    TOOL_COUNT="$(jq '.tools | length' "$META_JSON" 2>/dev/null || echo 0)"
+    add_md "- Count: ${TOOL_COUNT}"
+    add_md
+    for i in $(seq 0 $((TOOL_COUNT-1))); do
+      CLS="$(jq -r ".tools[$i].class" "$META_JSON")"
+      DESC="$(jq -r ".tools[$i].description" "$META_JSON")"
+      add_md "- ${CLS}"
+      if [[ -n "$DESC" && "$DESC" != "null" ]]; then
+        add_md_code "markdown" "$DESC"
+      fi
+      add_md
+    done
+  else
+    add_md "_jq not available; dumping raw JSON:_"
+    add_md_code "json" "$(cat "$META_JSON")"
+  fi
+else
+  add_md "⚠ Unable to extract server metadata."
+fi
+add_md
+
+# Optional upstream CapCorn API smoke check (if CAPCORN_BASE_URL provided)
+if [[ -n "${CAPCORN_BASE_URL:-}" ]]; then
+  hr
+  info "Performing optional upstream CapCorn API smoke check (rooms search)..."
+  add_md "## Upstream CapCorn API Smoke Check"
+  add_md
+  SEARCH_JSON="$(cat <<'JSON'
+{
+  "language": "de",
+  "timespan": { "from": "2025-11-20", "to": "2025-11-25" },
+  "duration": 2,
+  "adults": 2
+}
+JSON
+)"
+  SMOKE_OUT="${TMP_DIR}/capcorn_search.json"
+  set +e
+  HTTP_STATUS="$(curl -sS -m 20 -o "$SMOKE_OUT" -w '%{http_code}' -H 'Content-Type: application/json' -H 'Accept: application/json' -d "$SEARCH_JSON" "${CAPCORN_BASE_URL}/api/v1/rooms/search" || true)"
+  set -e
+  add_md "- CAPCORN_BASE_URL: ${CAPCORN_BASE_URL}"
+  add_md "- HTTP Status: ${HTTP_STATUS}"
+  add_md "**Response (first 120 lines):**"
+  add_md_code "json" "$(head -n 120 "$SMOKE_OUT" || true)"
+else
+  add_md "## Upstream CapCorn API Smoke Check"
+  add_md
+  add_md "_Skipped — set CAPCORN_BASE_URL to enable upstream smoke checks._"
 fi
 add_md
 
@@ -297,8 +419,7 @@ fi
 add_md "- Report file: ${REPORT_PATH}"
 add_md "- Base URL: ${BASE_URL}"
 add_md "- Endpoints:"
-add_md "  - Tourism: ${BASE_URL}/mcp/tourism"
-add_md "  - DSAPI:   ${BASE_URL}/mcp/dsapi"
+add_md "  - CapCorn: ${BASE_URL}/mcp/capcorn"
 add_md
 
 # Stop server if we started it here
