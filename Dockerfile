@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy composer manifests first for better layer caching
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --prefer-dist --no-progress --no-interaction --optimize-autoloader
+RUN composer install --no-dev --prefer-dist --no-progress --no-interaction --optimize-autoloader --no-scripts
 
 # Bring in the full application
 COPY . .
