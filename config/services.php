@@ -96,7 +96,7 @@ return [
     |
     */
     'capcorn' => [
-        'base_url' => env('CAPCORN_BASE_URL', 'http://localhost:9001'),
+        'base_url' => env('CAPCORN_BASE_URL', 'https://lookingcom-backend.vercel.app'),
     ],
 
 ];

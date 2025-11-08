@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "tourism-hackathon-temp-project",
+  "private_key_id": "7394bcd65c360484a121d5da0efdd9c0513ff97b",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDRK3ENd/YSVoFZ\nKjkehX17mWza4Vy67iLpEgltDd92HFdC2GqZp3dSdUnXpzFCaaMAoA1bmUNM+9Jr\nzYDn6WOOq4gc/MIhgiM4xBHg1lQgG+Scl7QtUZyXTXsyvwwYMNSNsncziM1OEBsO\n/Nn9gyOof4Yt6TngosLLFP99gkU1dWHEZ7DXuOUCVp/vI6iz/gJ47B4A1Fv+nXjt\nTHDxjhR6RE6WIp9QXfBnf96HXzpLqqNSRDOlJXISJsPF/wceWuPgmA7u05OVbEVX\n0DVAiYwaQ5vOcnmaoQT1+/iPSIXHVdS82XFQnUm2QXhFvn3wFrjWXOqnI3h+Z71R\n3sEJAtgNAgMBAAECggEAR1qG593O2yWYXWbqck9+ZW4KtMYhIIGA9joZbhLH8p4r\nZFm4T69RpJbvODpIMwwfN2Th+afYTggvmWfSvAohVLeOKLlOriibRE+ae7URoJxz\nSbn0lGsdPH4Jc1+5y/zIXYgOYs2dn64d1OiLopAcV2wdRUck380WHzoMB/ArFNdW\nHsKOSKXMwuFNL79L/LhICuVgMVUxHOKLkx1GWSVTCkdvEEdMmBQoZkFapm3kb7eZ\nl14vRwc9aUIh2bcrr7jOava7B0mh5dQswULT57hKqDUwcL5iPls9ebKRDJGrkG+J\no2rUiWULazU41+M64BFeY/GxRX1WicLGhUCA9RL+jwKBgQD9CQZrdo5puG+9z0+L\nTRvDFq6mQGnRh5ZuMqk7lX5yAzG+ScQ+UJoKgcCwzSkT0GBXHcaoGbsoON1ekZSn\nHnzOXPCn8QVb9IWsEdR6sXANJbmGCPo2YMW8h5JZuhhD7Ab4ndZikItkt1c0F0O5\nChPSHGMWQEW/bPsyv9AT0uhLBwKBgQDTntewZX/GI/tYWnZu38um8tSVRPjYrz5S\nNvGJwjqbfYrihLbE5y7lBzbwH+CF0GXfmDB/JYr5ujzCFAnCime7jENio9FIs74E\nHyE49sLyRr2j/zTulx+j9VTMz9sLZrEc13TJnoGzzNm+AtzTO0KC0Ih1YA02/0hF\n+tlgXTP7SwKBgQCE6NCucb+sWGyZTuOBUCdc+fUS7pKmtImXqJSr74JTcMoYIbcq\n5DuFeVI1jA4fkjyIheNrONjN79CXc/CZN7Jm0vq1vCwMeQwdrd/l8n3g6gfhF6YW\nGg7DUJLW/qDwTHH89Ss+6p3NcWAkxHOWJmzy2GZTsb7xJdVsesRZJVdO0QKBgQCx\n9TnclP5GWavcOPavdnOECWDLxhyd24DFEn88IaG3cHOC2af5HZBJ+S8x7xyYaw/A\nX/MoeSHNr9e4PbGXb1ycUu+325r7UGvSe3sstBZsNyDy8IJKwbtR3dVaBtFlXQ5D\n+suzYSAhW3sgVrfsykC8UTDvw75ZKYRVlQWIC9jS0QKBgQCPzftD3lz7j6MtryBB\nAZ0woB7+JRcbqf9puSgebTHEX+zzJL86g7Ywx/vmiwZd2fHykfsaJBMMj/HnTB8V\nWlNvPjG7eeMa9UJ4ccq35H+R376mPTdyWByaGqQH6SRT7iCKrPpz88HvJ3oUhWOh\nggMMKk5xVarGz/4rFD5K9he7Mw==\n-----END PRIVATE KEY-----\n",
+  "client_email": "gh-actions-deployer@tourism-hackathon-temp-project.iam.gserviceaccount.com",
+  "client_id": "113387090785384831059",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/gh-actions-deployer%40tourism-hackathon-temp-project.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

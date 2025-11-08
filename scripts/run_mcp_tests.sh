@@ -242,7 +242,7 @@ add_md
 INSPECT_OUT="${TMP_DIR}/inspector.txt"
 # Run inspector briefly and capture output, then terminate
 set +e
-php artisan mcp:inspector mcp/capcorn > "$INSPECT_OUT" 2>&1 &
+php artisan mcp:inspector mcp/capcorn -- > "$INSPECT_OUT" 2>&1 &
 INSPECT_PID=$!
 sleep 3
 if ps -p "$INSPECT_PID" >/dev/null 2>&1; then

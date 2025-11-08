@@ -1,8 +1,8 @@
 
-   INFO  Starting the MCP Inspector for server [mcp/tourism].  
+   INFO  Starting the MCP Inspector for server [mcp/capcorn].  
 
 Transport Type => Streamable HTTP
-URL => http://localhost:8000/mcp/tourism
+URL => http://localhost:8000/mcp/capcorn
 Secure => Your project must be accessible on HTTP for this to work due to how node manages SSL trust
 
 Starting MCP inspector...
