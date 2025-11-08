@@ -8,6 +8,7 @@
 .env
 .env.*
 !.env.example
+gcp-sa-key.json
 
 # Laravel storage (keep placeholder .gitignore files)
 /storage/*
