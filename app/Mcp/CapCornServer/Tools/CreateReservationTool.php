@@ -20,7 +20,6 @@ class CreateReservationTool extends Tool
     public function handle(Request $request): Response
     {
         $validated = $request->validate([
-            'hotel_id' => 'required|string',
             'room_type_code' => 'required|string|max:8',
             'number_of_units' => 'nullable|integer|min:1',
             'meal_plan' => 'required|integer|in:1,2,3,4,5',
@@ -54,7 +53,6 @@ class CreateReservationTool extends Tool
         $baseUrl = config('services.capcorn.base_url');
 
         $requestBody = [
-            'hotel_id' => $validated['hotel_id'],
             'room_type_code' => $validated['room_type_code'],
             'number_of_units' => $validated['number_of_units'] ?? 1,
             'meal_plan' => $validated['meal_plan'],
@@ -118,7 +116,6 @@ class CreateReservationTool extends Tool
 
         $formatted = "✅ Reservation Confirmed!\n\n";
         $formatted .= "🎫 Reservation ID: {$reservationId}\n";
-        $formatted .= "🏨 Hotel: {$request['hotel_id']}\n";
         $formatted .= "🛏️ Room: {$request['room_type_code']}\n";
         $formatted .= "📅 Check-in: {$request['arrival']}\n";
         $formatted .= "📅 Check-out: {$request['departure']}\n";
@@ -162,7 +159,6 @@ class CreateReservationTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'hotel_id' => $schema->string()->description('CapCorn Hotel ID.'),
             'room_type_code' => $schema->string()->description('Room category code from availability search (max 8 characters).'),
             'number_of_units' => $schema->integer()->description('Number of rooms to book (default: 1).'),
             'meal_plan' => $schema->integer()->description('Meal plan: 1=Breakfast, 2=Half board, 3=Full board, 4=No meals, 5=All inclusive.'),

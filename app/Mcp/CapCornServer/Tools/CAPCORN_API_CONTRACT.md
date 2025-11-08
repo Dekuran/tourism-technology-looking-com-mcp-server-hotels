@@ -100,7 +100,6 @@ CAPCORN_BASE_URL=https://lookingcom-backend.vercel.app
 ```php
 [
     'language' => 0,                 // 0=German, 1=English (default: 0)
-    'hotel_id' => '12345',           // CapCorn Hotel ID
     'arrival' => '2025-11-20',       // Check-in date
     'departure' => '2025-11-23',     // Check-out date
     'rooms' => [                     // Can request multiple rooms (max 10)
@@ -123,7 +122,6 @@ CAPCORN_BASE_URL=https://lookingcom-backend.vercel.app
 {
     "members": [
         {
-            "hotel_id": "12345",
             "rooms": [
                 {
                     "arrival": "2025-11-20",
@@ -172,7 +170,6 @@ CAPCORN_BASE_URL=https://lookingcom-backend.vercel.app
 **Parameters:**
 ```php
 [
-    'hotel_id' => '12345',
     'room_type_code' => 'DZ',        // From search results (catc)
     'number_of_units' => 1,          // Number of rooms (default: 1)
     'meal_plan' => 1,                // 1=Breakfast, 2=Half board, 3=Full board, 4=No meals, 5=All inclusive

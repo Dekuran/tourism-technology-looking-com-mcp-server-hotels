@@ -21,7 +21,6 @@ class SearchRoomAvailabilityTool extends Tool
     {
         $validated = $request->validate([
             'language' => 'nullable|integer|in:0,1',
-            'hotel_id' => 'required|string',
             'arrival' => 'required|date_format:Y-m-d',
             'departure' => 'required|date_format:Y-m-d|after:arrival',
             'rooms' => 'required|array|min:1|max:10',
@@ -34,7 +33,6 @@ class SearchRoomAvailabilityTool extends Tool
 
         $requestBody = [
             'language' => $validated['language'] ?? 0,
-            'hotel_id' => $validated['hotel_id'],
             'arrival' => $validated['arrival'],
             'departure' => $validated['departure'],
             'rooms' => $validated['rooms'],
@@ -73,10 +71,8 @@ class SearchRoomAvailabilityTool extends Tool
         $formatted .= "👥 " . count($request['rooms']) . " room(s) requested\n\n";
 
         foreach ($members as $memberIndex => $member) {
-            $hotelId = $member['hotel_id'] ?? 'Unknown';
             $rooms = $member['rooms'] ?? [];
 
-            $formatted .= "🏢 Hotel ID: {$hotelId}\n";
             $formatted .= str_repeat('═', 60) . "\n\n";
 
             foreach ($rooms as $roomIndex => $roomSearch) {
@@ -145,7 +141,6 @@ class SearchRoomAvailabilityTool extends Tool
     {
         return [
             'language' => $schema->integer()->description('Language: 0 for German, 1 for English (default: 0).'),
-            'hotel_id' => $schema->string()->description('CapCorn Hotel ID.'),
             'arrival' => $schema->string()->description('Check-in date (YYYY-MM-DD).'),
             'departure' => $schema->string()->description('Check-out date (YYYY-MM-DD).'),
             'rooms' => $schema->array()->items(

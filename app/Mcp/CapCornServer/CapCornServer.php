@@ -56,7 +56,6 @@ class CapCornServer extends Server
         
         **Parameters:**
         - `language`: 0 for German, 1 for English (default: 0)
-        - `hotel_id`: CapCorn Hotel ID
         - `arrival`: Check-in date (YYYY-MM-DD)
         - `departure`: Check-out date (YYYY-MM-DD)
         - `rooms`: List of rooms with adults and children (max 10 rooms)
@@ -67,7 +66,6 @@ class CapCornServer extends Server
         **Use when:** User wants to book a room after finding availability.
         
         **Required Parameters:**
-        - `hotel_id`: CapCorn Hotel ID
         - `room_type_code`: Room category code from availability search (max 8 chars)
         - `meal_plan`: Included meals (1=Breakfast, 2=Half board, 3=Full board, 4=No meals, 5=All inclusive)
         - `guest_counts`: Adults and children counts with age qualifying codes
