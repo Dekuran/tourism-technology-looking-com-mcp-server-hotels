@@ -11,7 +11,7 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-interaction --opt
 COPY . .
 
 # Ensure optimized autoload after full copy
-RUN composer dump-autoload -o
+RUN composer dump-autoload -o --no-scripts
 
 # Stage 2: Runtime - PHP CLI serving public/ via built-in server
 # Cloud Run requires a single process listening on $PORT
