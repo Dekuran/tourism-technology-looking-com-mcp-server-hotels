@@ -1,20 +1,30 @@
-# Deploying Laravel MCP Server to Google Cloud Run
+# Deploying CapCorn MCP Server to Google Cloud Run
 
-This guide deploys the MCP Tourism/DSAPI Laravel server to Google Cloud Run in your project:
-- Project ID: tourism-hackathon-temp-project
-- Region: europe-west1
-- Service name: mcp-hotel-server
-- Public access enabled (MCP clients can reach your endpoints)
+This guide explains how to deploy the CapCorn Hotel MCP Server to Google Cloud Run using the provided Dockerfile and GitHub Actions workflow. The service exposes a single MCP endpoint:
 
-CI/CD is configured via GitHub Actions to build a container image, push to Artifact Registry, and deploy to Cloud Run on every push to main.
+- Server: `/mcp/capcorn`
+- Metadata (JSON): `/mcp/capcorn/meta`
+
+Key repo paths:
+- Route: [routes/ai.php](routes/ai.php)
+- Server: [class CapCornServer extends Server](app/Mcp/CapCornServer/CapCornServer.php:10)
+- Tools:
+  - [class SearchRoomsTool extends Tool](app/Mcp/CapCornServer/Tools/SearchRoomsTool.php:12)
+  - [class SearchRoomAvailabilityTool extends Tool](app/Mcp/CapCornServer/Tools/SearchRoomAvailabilityTool.php:12)
+  - [class CreateReservationTool extends Tool](app/Mcp/CapCornServer/Tools/CreateReservationTool.php:12)
+- CI workflow: [.github/workflows/deploy-cloudrun.yml](.github/workflows/deploy-cloudrun.yml)
+- Runtime entrypoint: [docker/entrypoint.sh](docker/entrypoint.sh)
+- Dockerfile: [Dockerfile](Dockerfile)
+
+Note: This app does not depend on a database. It’s a stateless MCP server that proxies to an upstream CapCorn API configured via [config/services.php](config/services.php).
+
 
 ## 1) Prerequisites
 
-- Billing enabled on the GCP project
-- gcloud CLI installed and logged in (for local verification)
+- A Google Cloud project with billing enabled
+- Google Cloud CLI (gcloud) installed and authenticated (for local checks)
 - GitHub repository connected (this repo)
-
-Enable APIs (one-time):
+- APIs enabled (one-time):
 ```bash
 gcloud services enable \
   run.googleapis.com \
@@ -22,11 +32,12 @@ gcloud services enable \
   iam.googleapis.com
 ```
 
+
 ## 2) Service Account and GitHub Secret
 
-Create a purpose-built Service Account for CI:
+Create a dedicated deployer Service Account (names are examples; adjust as needed):
 ```bash
-PROJECT_ID="tourism-hackathon-temp-project"
+PROJECT_ID="your-gcp-project-id"
 SA_NAME="gh-actions-deployer"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -35,7 +46,7 @@ gcloud iam service-accounts create "$SA_NAME" \
   --display-name "GitHub Actions Cloud Run Deployer"
 ```
 
-Grant required roles:
+Grant minimal required roles:
 ```bash
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member "serviceAccount:${SA_EMAIL}" \
@@ -50,152 +61,150 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role "roles/iam.serviceAccountUser"
 ```
 
-Create a JSON key (store securely):
+Create a JSON key (store only long enough to add as a GitHub secret):
 ```bash
 gcloud iam service-accounts keys create ./gcp-sa-key.json \
   --iam-account "$SA_EMAIL" \
   --project "$PROJECT_ID"
 ```
 
-Add GitHub Secret:
-- In GitHub: Settings → Secrets and variables → Actions → New repository secret
+Add GitHub secret:
+- GitHub → Settings → Secrets and variables → Actions → New repository secret
 - Name: GCP_SA_KEY
-- Value: paste the contents of gcp-sa-key.json
+- Value: paste the contents of `gcp-sa-key.json`
 
-Then delete the local key file if desired:
-```bash
-shred -u ./gcp-sa-key.json
-```
+Important: Do not commit `gcp-sa-key.json` to the repository. The repo’s [.gitignore](.gitignore) prevents this; delete the local file after adding the secret.
+
 
 ## 3) CI/CD Workflow
 
-The GitHub Action [deploy-cloudrun.yml](.github/workflows/deploy-cloudrun.yml) builds and deploys on push to main:
-- Creates Artifact Registry repo if missing
-- Builds Docker image from [Dockerfile](Dockerfile)
-- Pushes to europe-west1-docker.pkg.dev
-- Deploys Cloud Run service with:
-  - --allow-unauthenticated (public)
-  - --ingress all (public from internet)
-  - MCP-friendly streaming over HTTP
-  - MASTERCARD_MOCK=true (tests pass without live credentials)
+The workflow [.github/workflows/deploy-cloudrun.yml](.github/workflows/deploy-cloudrun.yml) builds and deploys on push to main:
+- Authenticates to GCP using `secrets.GCP_SA_KEY`
+- Builds a Docker image
+- Pushes to Artifact Registry
+- Deploys to Cloud Run with public ingress
 
-Important workflow env defaults:
-- PROJECT_ID: tourism-hackathon-temp-project
-- REGION: europe-west1
-- SERVICE: mcp-hotel-server
-- GAR_REPO: mcp-hotel-server
+Default environment variables in the workflow:
+- PROJECT_ID
+- REGION
+- SERVICE
+- GAR_REPO
 
-Adjust inside [.github/workflows/deploy-cloudrun.yml](.github/workflows/deploy-cloudrun.yml) if needed.
+Adjust these via the `env:` block in the workflow if needed.
 
 Trigger a deploy:
-- Push to main, or
-- Manually: Actions → Deploy to Cloud Run → Run workflow
+- Push to `main`, or
+- Actions → “Deploy to Cloud Run” → “Run workflow”
 
-The workflow prints the service URL as a summary output.
 
-## 4) Runtime Image, EntryPoint, and Public Access
+## 4) Cloud Run Service Configuration
 
-- Container is built from [Dockerfile](Dockerfile) using multi-stage Composer build
-- Entrypoint: [docker/entrypoint.sh](docker/entrypoint.sh)
-  - Generates APP_KEY if missing
+The deploy step sets typical defaults for a public HTTP service:
+- `--allow-unauthenticated`
+- `--ingress all`
+- `--timeout 300`
+- `--cpu 1`
+- `--memory 512Mi`
+- `--min-instances 0`
+- `--max-instances 3`
+- Env vars: `APP_ENV=production, LOG_CHANNEL=stderr, CACHE_DRIVER=file, SESSION_DRIVER=array`
+
+After deployment, fetch the service URL:
+```bash
+gcloud run services describe "$SERVICE" \
+  --region "$REGION" \
+  --format='value(status.url)'
+```
+
+
+## 5) Runtime Image and Entrypoint
+
+- Multi-stage Docker build: [Dockerfile](Dockerfile)
+- Entrypoint script: [docker/entrypoint.sh](docker/entrypoint.sh)
+  - Ensures `APP_KEY`
   - Caches config/views
-  - Serves public/ via PHP built-in server on $PORT (Cloud Run injects PORT)
-- Public access is enabled via:
-  - --allow-unauthenticated
-  - --ingress all
+  - Starts PHP’s built-in server bound to `$PORT` (injected by Cloud Run)
 
-Cloud Run will expose a URL like:
-```
-https://mcp-hotel-server-xxxxxxxx-uc.a.run.app
-```
 
-## 5) MCP Endpoints and Quick Checks
+## 6) MCP Endpoints and Quick Checks
 
-MCP servers (HTTP endpoints) are registered in [routes/ai.php](routes/ai.php):
-- Tourism Server: /mcp/tourism
-- DSAPI Server: /mcp/dsapi
+Public endpoints (after deploy):
+- Root: `GET /` (welcome page)
+- MCP metadata: `GET /mcp/capcorn/meta` (JSON with name, version, instructions, tool list)
+- MCP server: `POST /mcp/capcorn` (MCP transport; `GET` returns 405 by design)
 
-Public URLs after deploy:
-- Root (Welcome): https://YOUR_SERVICE_URL/
-- Tourism MCP: https://YOUR_SERVICE_URL/mcp/tourism
-- DSAPI MCP: https://YOUR_SERVICE_URL/mcp/dsapi
-
-Note: GET on /mcp endpoints returns 405 (Method Not Allowed) because MCP uses streaming HTTP POST and protocol handshakes. That is expected. The Root route (/) should return 200 with the welcome page.
-
-Quick smoke tests:
+Quick smoke test:
 ```bash
 SERVICE_URL="$(gcloud run services describe mcp-hotel-server \
   --region europe-west1 --format='value(status.url)')"
 
 curl -i "$SERVICE_URL/"
-curl -i "$SERVICE_URL/mcp/tourism"  # expected 405 on GET
-curl -i "$SERVICE_URL/mcp/dsapi"    # expected 405 on GET
+curl -i "$SERVICE_URL/mcp/capcorn/meta"
+# Note: GET "$SERVICE_URL/mcp/capcorn" should return 405
 ```
 
-## 6) Environment Variables
 
-By default, workflow sets:
-- APP_ENV=production
-- LOG_CHANNEL=stderr
-- CACHE_DRIVER=file
-- SESSION_DRIVER=array
-- MASTERCARD_MOCK=true
+## 7) Configuration
 
-To use real Mastercard API, set in Cloud Run (and remove the mock):
-- MASTERCARD_CONSUMER_KEY
-- MASTERCARD_PRIVATE_KEY (PEM contents)
-- MASTERCARD_API_URL (e.g., https://api.mastercard.com)
-- Remove MASTERCARD_MOCK=true or set to false
+Only one config block is required:
+- [config/services.php](config/services.php)
+  - `capcorn.base_url`: Upstream CapCorn base URL
 
-Update env vars (any time):
+Set in `.env`:
+```env
+CAPCORN_BASE_URL=https://your-capcorn-backend.example.com
+```
+
+
+## 8) Local Development
+
 ```bash
-gcloud run services update mcp-hotel-server \
-  --region europe-west1 \
-  --set-env-vars "MASTERCARD_MOCK=false,MASTERCARD_CONSUMER_KEY=...,MASTERCARD_PRIVATE_KEY=...,MASTERCARD_API_URL=..."
+composer install
+cp .env.example .env
+php artisan key:generate
+
+php artisan serve
+# http://localhost:8000
+# MCP: POST http://localhost:8000/mcp/capcorn
+# Meta: GET  http://localhost:8000/mcp/capcorn/meta
 ```
 
-Optional:
-- APP_URL can be set to your Cloud Run URL for link generation.
-
-## 7) Local Container Test (Optional)
-
-Build and run locally (port 8080):
+Inspector (optional):
 ```bash
-docker build -t mcp-hotel-server:local .
-docker run --rm -p 8080:8080 \
-  -e APP_ENV=production \
-  -e LOG_CHANNEL=stderr \
-  -e CACHE_DRIVER=file \
-  -e SESSION_DRIVER=array \
-  mcp-hotel-server:local
-
-# Then visit http://localhost:8080/
+php artisan mcp:inspector mcp/capcorn
 ```
 
-## 8) Operations
 
-- Logs: Cloud Logging (Logs Explorer), or `gcloud run services logs read mcp-hotel-server --region europe-west1`
-- Revisions: Managed by Cloud Run; can roll back to prior revision easily
-- Scaling: min-instances=0, max-instances=3 set in workflow (edit as needed)
-- Streaming: MCP inspector and HTTP streaming are supported by Cloud Run
+## 9) Verification Scripts
 
-## 9) Security
+Local end-to-end verification producing a Markdown report:
+- [scripts/run_mcp_tests.sh](scripts/run_mcp_tests.sh)
+```bash
+bash scripts/run_mcp_tests.sh
+# Outputs a report under ./reports/
+```
 
-- Public access is intentionally enabled for MCP clients
-- If you later need to restrict access, remove `--allow-unauthenticated` and configure IAM or a custom proxy
-- Keep the GitHub Service Account key secret (GCP_SA_KEY). Rotate periodically.
+Remote Cloud Run checks (no local server):
+- [scripts/run_cloudrun_checks.sh](scripts/run_cloudrun_checks.sh)
+```bash
+bash scripts/run_cloudrun_checks.sh --url https://YOUR_SERVICE_URL
+```
 
-## 10) Repo Artifacts
+Both scripts probe only MCP endpoints and metadata. They do not directly call the upstream CapCorn REST API, ensuring testing flows through your tools.
 
-- CI workflow: [.github/workflows/deploy-cloudrun.yml](.github/workflows/deploy-cloudrun.yml)
-- Docker image: [Dockerfile](Dockerfile)
-- Entrypoint: [docker/entrypoint.sh](docker/entrypoint.sh)
 
-Once the first deployment finishes, get your service URL and use it in MCP clients:
-- Tourism MCP: https://YOUR_SERVICE_URL/mcp/tourism
-- DSAPI MCP: https://YOUR_SERVICE_URL/mcp/dsapi
+## 10) Security
 
-You can also run the included validation before pushing:
-- Start server locally and verify: [scripts/all.sh](scripts/all.sh)
-- Generate full suite report: [scripts/run_mcp_tests.sh](scripts/run_mcp_tests.sh)
-- Focused Booking API report: [scripts/test_booking_api.sh](scripts/test_booking_api.sh)
+- Do not commit secret keys; use GitHub Secrets and Cloud Run environment variables.
+- The repo ignores `.env` and `gcp-sa-key.json`.
+- If a key was ever committed, revoke/rotate it in GCP IAM and scrub it from git history (BFG or `git filter-repo`).
+
+
+## 11) Troubleshooting
+
+- `GET /mcp/capcorn` returns 405
+  - Expected. Use `POST` for MCP traffic or `GET /mcp/capcorn/meta` for metadata.
+- Autoload issues after adding/removing classes
+  - `composer dump-autoload -o`
+- Service not reachable
+  - Check Cloud Run logs, ingress settings, and whether your region/service name matches the workflow env vars.

@@ -1,4 +1,4 @@
-l#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -Eeuo pipefail
 
 # start_mcp_server.sh - Start Laravel MCP Server with auto-setup and readiness checks
@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Ensure directories
-mkdir -p storage/logs database
+mkdir -p storage/logs
 
 # Prerequisites
 for cmd in php composer curl; do
@@ -83,8 +83,8 @@ APP_ENV=local
 APP_DEBUG=true
 APP_KEY=
 APP_URL=http://localhost:8000
-DB_CONNECTION=sqlite
-DB_DATABASE=database/database.sqlite
+# DB_CONNECTION not required
+# DB_DATABASE not required
 CACHE_DRIVER=file
 EOF
   fi
@@ -104,17 +104,9 @@ if ! grep -E '^APP_KEY=.+$' .env >/dev/null 2>&1; then
   php artisan key:generate
 fi
 
-# Ensure SQLite database file
-if [[ ! -f database/database.sqlite ]]; then
-  info "Creating SQLite database at database/database.sqlite ..."
-  : > database/database.sqlite
-fi
+# Database not required for MCP server (no SQLite file needed)
 
-# Run migrations
-info "Running database migrations ..."
-if ! php artisan migrate --force; then
-  warn "Migrations failed or none to run."
-fi
+# No database migrations required for MCP server
 
 # Stop existing server if requested
 if [[ -f .mcp_server.pid ]]; then

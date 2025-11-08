@@ -74,7 +74,7 @@ jobs:
             --memory 512Mi \
             --min-instances 0 \
             --max-instances 3 \
-            --set-env-vars "APP_ENV=production,LOG_CHANNEL=stderr,CACHE_DRIVER=file,SESSION_DRIVER=array,MASTERCARD_MOCK=true"
+            --set-env-vars "APP_ENV=production,LOG_CHANNEL=stderr,CACHE_DRIVER=file,SESSION_DRIVER=array"
 
       - name: Fetch Service URL
         id: url
