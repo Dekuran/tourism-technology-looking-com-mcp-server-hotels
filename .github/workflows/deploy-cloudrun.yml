@@ -1,0 +1,76 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: tourism-hackathon-temp-project
+  REGION: europe-west1
+  SERVICE: mcp-hotel-server
+  GAR_REPO: mcp-hotel-server
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Authenticate to GCP using a Service Account JSON key stored in GitHub Secrets
+      # Required secrets (in your repo settings → Secrets and variables → Actions):
+      # - GCP_SA_KEY: Service account JSON with roles:
+      #     Artifact Registry Writer, Cloud Run Admin, Service Account User
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Ensure Artifact Registry repository
+        run: |
+          gcloud artifacts repositories describe "$GAR_REPO" --location="$REGION" >/dev/null 2>&1 || \
+          gcloud artifacts repositories create "$GAR_REPO" \
+            --repository-format=docker \
+            --location="$REGION"
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
+
+      - name: Set IMAGE tag
+        run: echo "IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.SERVICE }}:${{ github.sha }}" >> "$GITHUB_ENV"
+
+      - name: Build container image
+        run: docker build -t "$IMAGE" .
+
+      - name: Push image
+        run: docker push "$IMAGE"
+
+      - name: Deploy to Cloud Run (public MCP server)
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --platform managed \
+            --allow-unauthenticated \
+            --ingress all \
+            --timeout 300 \
+            --cpu 1 \
+            --memory 512Mi \
+            --min-instances 0 \
+            --max-instances 3 \
+            --set-env-vars "APP_ENV=production,LOG_CHANNEL=stderr,CACHE_DRIVER=file,SESSION_DRIVER=array,MASTERCARD_MOCK=true"
+
+      - name: Fetch Service URL
+        id: url
+        run: |
+          URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
+          echo "SERVICE_URL=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "Deployed to: ${{ steps.url.outputs.SERVICE_URL }}"
