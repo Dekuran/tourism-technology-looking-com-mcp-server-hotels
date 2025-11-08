@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+l#!/usr/bin/env bash
 set -Eeuo pipefail
 
 # start_mcp_server.sh - Start Laravel MCP Server with auto-setup and readiness checks

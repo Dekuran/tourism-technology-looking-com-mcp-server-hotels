@@ -36,24 +36,14 @@ REPORT_PATH="${REPORTS_DIR}/mcp_cloudrun_report-${TIMESTAMP}.md"
 
 usage() {
   cat <<EOF
-Usage: $0 --url https://SERVICE-URL.run.app
+Usage: $0 [--url https://SERVICE-URL.run.app]
 
 Options:
-  -u, --url URL    Cloud Run base URL (required unless CLOUDRUN_URL env is set)
+  -u, --url URL    Cloud Run base URL (defaults to https://mcp-hotel-server-336151914785.europe-west1.run.app)
   -h, --help       Show help
 
 Environment variables:
-  CLOUDRUN_URL                 Base URL (e.g. https://mcp-hotel-server-*.run.app)
-  CAPCORN_BASE_URL             Optional upstream API base (e.g. https://lookingcom-backend.vercel.app)
-  CAPCORN_HOTEL_ID             Optional hotel id for availability smoke (default 9100)
-  CAPCORN_SMOKE_TIMESPAN_FROM  Default 2025-11-20
-  CAPCORN_SMOKE_TIMESPAN_TO    Default 2025-11-25
-  CAPCORN_SMOKE_DURATION       Default 2
-  CAPCORN_SMOKE_ADULTS         Default 2
-  CAPCORN_SMOKE_LANG           Default 0
-  CAPCORN_SMOKE_ARRIVAL        Default 2025-11-21
-  CAPCORN_SMOKE_DEPARTURE      Default 2025-11-23
-  CAPCORN_SMOKE_ROOM1_ADULTS   Default 2
+  CLOUDRUN_URL                 Base URL (overrides default if provided)
 EOF
 }
 
@@ -68,9 +58,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+DEFAULT_CLOUDRUN_URL="https://mcp-hotel-server-336151914785.europe-west1.run.app"
 if [[ -z "${CLOUDRUN_URL}" ]]; then
-  error "Missing --url or CLOUDRUN_URL. Example: --url https://mcp-hotel-server-XXXX.run.app"
-  exit 2
+  warn "No --url provided. Using default Cloud Run URL: ${DEFAULT_CLOUDRUN_URL}"
+  CLOUDRUN_URL="${DEFAULT_CLOUDRUN_URL}"
 fi
 
 mkdir -p "$REPORTS_DIR" "$TMP_DIR"
