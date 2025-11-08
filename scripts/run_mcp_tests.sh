@@ -267,33 +267,37 @@ add_md
 SERVER_META_PHP="${TMP_DIR}/server_meta.php"
 cat > "$SERVER_META_PHP" <<'PHP'
 <?php
-// Bootstrap Laravel
 require __DIR__ . '/../vendor/autoload.php';
-$app = require __DIR__ . '/../bootstrap/app.php';
-$kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
-$kernel->bootstrap();
 
 $fqcn = \App\Mcp\CapCornServer\CapCornServer::class;
-$server = app($fqcn);
 
-$prop = static function(object $obj, string $name) {
-    $rp = new ReflectionProperty($obj, $name);
-    $rp->setAccessible(true);
-    return $rp->getValue($obj);
-};
+try {
+    $rc = new ReflectionClass($fqcn);
+    $defaults = $rc->getDefaultProperties();
 
-$instructions = $prop($server, 'instructions');
-$toolClasses = $prop($server, 'tools') ?? [];
+    $instructions = $defaults['instructions'] ?? null;
+    $toolClasses = $defaults['tools'] ?? [];
+} catch (\Throwable $e) {
+    echo json_encode([
+        'server' => $fqcn,
+        'error' => 'reflection_failed',
+        'message' => $e->getMessage(),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit(0);
+}
 
 $tools = [];
 foreach ($toolClasses as $toolClass) {
     $desc = null;
     try {
         $trc = new ReflectionClass($toolClass);
-        if ($trc->hasProperty('description')) {
+        $tDefaults = $trc->getDefaultProperties();
+        if (array_key_exists('description', $tDefaults)) {
+            $desc = $tDefaults['description'];
+        } elseif ($trc->hasProperty('description')) {
+            // Fallback: read protected property via reflection without constructor
             $rp = $trc->getProperty('description');
             $rp->setAccessible(true);
-            // Try instantiate without constructor to access default description
             $inst = $trc->newInstanceWithoutConstructor();
             $desc = $rp->getValue($inst);
         }
@@ -316,11 +320,15 @@ PHP
 META_JSON="${TMP_DIR}/server_meta.json"
 php "$SERVER_META_PHP" > "$META_JSON" 2>/dev/null || true
 if [[ -s "$META_JSON" ]]; then
+  # Be resilient to jq parse errors without aborting the script
+  set +e
   if command -v jq >/dev/null 2>&1; then
     INSTRUCTIONS="$(jq -r '.instructions' "$META_JSON" 2>/dev/null || cat "$META_JSON")"
   else
     INSTRUCTIONS="$(cat "$META_JSON")"
   fi
+  set -e
+
   add_md "### Server Instructions"
   if command -v head >/dev/null 2>&1; then
     printf "%s" "$INSTRUCTIONS" | head -n 400 > "${TMP_DIR}/instructions.txt"
@@ -329,14 +337,19 @@ if [[ -s "$META_JSON" ]]; then
     add_md_code "markdown" "$INSTRUCTIONS"
   fi
   add_md
+
   add_md "### Registered Tools"
   if command -v jq >/dev/null 2>&1; then
+    set +e
     TOOL_COUNT="$(jq '.tools | length' "$META_JSON" 2>/dev/null || echo 0)"
+    set -e
     add_md "- Count: ${TOOL_COUNT}"
     add_md
     for i in $(seq 0 $((TOOL_COUNT-1))); do
-      CLS="$(jq -r ".tools[$i].class" "$META_JSON")"
-      DESC="$(jq -r ".tools[$i].description" "$META_JSON")"
+      set +e
+      CLS="$(jq -r ".tools[$i].class" "$META_JSON" 2>/dev/null || echo "")"
+      DESC="$(jq -r ".tools[$i].description" "$META_JSON" 2>/dev/null || echo "")"
+      set -e
       add_md "- ${CLS}"
       if [[ -n "$DESC" && "$DESC" != "null" ]]; then
         add_md_code "markdown" "$DESC"
@@ -352,33 +365,61 @@ else
 fi
 add_md
 
-# Optional upstream CapCorn API smoke check (if CAPCORN_BASE_URL provided)
+# Optional upstream CapCorn API smoke checks (if CAPCORN_BASE_URL provided)
 if [[ -n "${CAPCORN_BASE_URL:-}" ]]; then
   hr
-  info "Performing optional upstream CapCorn API smoke check (rooms search)..."
-  add_md "## Upstream CapCorn API Smoke Check"
+  info "Performing upstream CapCorn API smoke checks for SearchRoomsTool and SearchRoomAvailabilityTool..."
+  add_md "## Tool Smoke Checks (via upstream CapCorn API)"
   add_md
-  SEARCH_JSON="$(cat <<'JSON'
+  add_md "- CAPCORN_BASE_URL: ${CAPCORN_BASE_URL}"
+
+  # SearchRoomsTool smoke (rooms/search)
+  add_md "### SearchRoomsTool (rooms/search)"
+  SEARCH_JSON="$(cat <<JSON
 {
   "language": "de",
-  "timespan": { "from": "2025-11-20", "to": "2025-11-25" },
-  "duration": 2,
-  "adults": 2
+  "timespan": { "from": "${CAPCORN_SMOKE_TIMESPAN_FROM:-2025-11-20}", "to": "${CAPCORN_SMOKE_TIMESPAN_TO:-2025-11-25}" },
+  "duration": ${CAPCORN_SMOKE_DURATION:-2},
+  "adults": ${CAPCORN_SMOKE_ADULTS:-2}
 }
 JSON
 )"
-  SMOKE_OUT="${TMP_DIR}/capcorn_search.json"
+  SMOKE_OUT_SEARCH="${TMP_DIR}/capcorn_search.json"
   set +e
-  HTTP_STATUS="$(curl -sS -m 20 -o "$SMOKE_OUT" -w '%{http_code}' -H 'Content-Type: application/json' -H 'Accept: application/json' -d "$SEARCH_JSON" "${CAPCORN_BASE_URL}/api/v1/rooms/search" || true)"
+  HTTP_STATUS_SEARCH="$(curl -sS -m 25 -o "$SMOKE_OUT_SEARCH" -w '%{http_code}' -H 'Content-Type: application/json' -H 'Accept: application/json' -d "$SEARCH_JSON" "${CAPCORN_BASE_URL}/api/v1/rooms/search" || true)"
   set -e
-  add_md "- CAPCORN_BASE_URL: ${CAPCORN_BASE_URL}"
-  add_md "- HTTP Status: ${HTTP_STATUS}"
+  add_md "- HTTP Status: ${HTTP_STATUS_SEARCH}"
   add_md "**Response (first 120 lines):**"
-  add_md_code "json" "$(head -n 120 "$SMOKE_OUT" || true)"
-else
-  add_md "## Upstream CapCorn API Smoke Check"
+  add_md_code "json" "$(head -n 120 "$SMOKE_OUT_SEARCH" || true)"
   add_md
-  add_md "_Skipped — set CAPCORN_BASE_URL to enable upstream smoke checks._"
+
+  # SearchRoomAvailabilityTool smoke (rooms/availability)
+  add_md "### SearchRoomAvailabilityTool (rooms/availability)"
+  AVAIL_JSON="$(cat <<JSON
+{
+  "language": ${CAPCORN_SMOKE_LANG:-0},
+  "hotel_id": "${CAPCORN_HOTEL_ID:-HOTEL-EXAMPLE}",
+  "arrival": "${CAPCORN_SMOKE_ARRIVAL:-2025-11-20}",
+  "departure": "${CAPCORN_SMOKE_DEPARTURE:-2025-11-23}",
+  "rooms": [
+    {
+      "adults": ${CAPCORN_SMOKE_ROOM1_ADULTS:-2}
+    }
+  ]
+}
+JSON
+)"
+  SMOKE_OUT_AVAIL="${TMP_DIR}/capcorn_availability.json"
+  set +e
+  HTTP_STATUS_AVAIL="$(curl -sS -m 25 -o "$SMOKE_OUT_AVAIL" -w '%{http_code}' -H 'Content-Type: application/json' -H 'Accept: application/json' -d "$AVAIL_JSON" "${CAPCORN_BASE_URL}/api/v1/rooms/availability" || true)"
+  set -e
+  add_md "- HTTP Status: ${HTTP_STATUS_AVAIL}"
+  add_md "**Response (first 120 lines):**"
+  add_md_code "json" "$(head -n 120 "$SMOKE_OUT_AVAIL" || true)"
+else
+  add_md "## Tool Smoke Checks (via upstream CapCorn API)"
+  add_md
+  add_md "_Skipped — set CAPCORN_BASE_URL to enable upstream smoke checks for SearchRoomsTool and SearchRoomAvailabilityTool._"
 fi
 add_md
 
