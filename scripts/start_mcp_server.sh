@@ -81,6 +81,7 @@ if [[ ! -f .env ]]; then
 APP_NAME="Tourism MCP Server"
 APP_ENV=local
 APP_DEBUG=true
+APP_KEY=
 APP_URL=http://localhost:8000
 DB_CONNECTION=sqlite
 DB_DATABASE=database/database.sqlite
@@ -88,12 +89,18 @@ CACHE_DRIVER=file
 EOF
   fi
   info "Generating APP_KEY ..."
+  if ! grep -q '^APP_KEY=' .env; then
+    printf '\nAPP_KEY=\n' >> .env
+  fi
   php artisan key:generate
 fi
 
 # Ensure APP_KEY
 if ! grep -E '^APP_KEY=.+$' .env >/dev/null 2>&1; then
-  info "APP_KEY not set; generating ..."
+  info "APP_KEY not set or missing; generating ..."
+  if ! grep -q '^APP_KEY=' .env; then
+    printf '\nAPP_KEY=\n' >> .env
+  fi
   php artisan key:generate
 fi
 
@@ -136,10 +143,11 @@ SRV_PID=$!
 echo "$SRV_PID" > .mcp_server.pid
 info "PID: $SRV_PID (logs: $LOG_FILE)"
 
-# Readiness probe (30s)
-ATTEMPTS=30
+# Readiness probe (up to 60s)
+ATTEMPTS=60
 for i in $(seq 1 "$ATTEMPTS"); do
   HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/" || true)"
+  info "Readiness attempt $i/$ATTEMPTS → HTTP ${HTTP_CODE:-N/A}"
   if [[ "$HTTP_CODE" =~ ^[0-9]+$ ]] && [[ "$HTTP_CODE" -ge 200 && "$HTTP_CODE" -lt 500 ]]; then
     success "Server is reachable (HTTP $HTTP_CODE) at http://127.0.0.1:$PORT"
     echo

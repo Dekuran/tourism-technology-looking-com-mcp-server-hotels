@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Avoid SIGPIPE-caused termination in some terminals/CI when using pipes
+# We keep -eEu but turn off pipefail for resilience.
+set +o pipefail || true
+
 # run_mcp_tests.sh - Thorough verification and Markdown report for MCP Server
 # - Colorful console logs
 # - Generates timestamped Markdown report under ./reports/
@@ -132,6 +136,7 @@ if [[ ! -f .env ]]; then
 APP_NAME="Tourism MCP Server"
 APP_ENV=local
 APP_DEBUG=true
+APP_KEY=
 APP_URL=http://localhost:8000
 DB_CONNECTION=sqlite
 DB_DATABASE=database/database.sqlite
@@ -185,7 +190,7 @@ add_md
 hr
 info "Verifying MCP routes (route:list)..."
 ROUTES_TXT="$(php artisan route:list 2>&1 || true)"
-MCP_ROUTES="$(php artisan route:list 2>&1 | grep '/mcp/' || true)"
+MCP_ROUTES="$(php artisan route:list 2>&1 | grep 'mcp/' || true)"
 add_md "## MCP Routes"
 add_md
 if [[ -n "$MCP_ROUTES" ]]; then
@@ -204,8 +209,8 @@ test_endpoint() {
   local path="$1"
   local url="${BASE_URL}${path}"
   local status body snippet
-  status="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
-  body="$(curl -s "$url" || true)"
+  status="$(curl -sS -m 10 -o /dev/null -w '%{http_code}' "$url" || true)"
+  body="$(curl -sS -m 10 "$url" || true)"
   snippet="$(printf "%s" "$body" | head -c 1000)"
   add_md "### GET ${path}"
   add_md
@@ -263,8 +268,9 @@ add_md
 TEST_OUT="${TMP_DIR}/phpunit.txt"
 set +e
 php artisan config:clear --ansi >/dev/null 2>&1 || true
-php artisan test | tee "$TEST_OUT"
-TEST_EXIT=${PIPESTATUS[0]}
+# Write full PHPUnit output to file to avoid SIGPIPE issues with tee
+php artisan test > "$TEST_OUT" 2>&1
+TEST_EXIT=$?
 set -e
 
 add_md "_Tail of test output:_"

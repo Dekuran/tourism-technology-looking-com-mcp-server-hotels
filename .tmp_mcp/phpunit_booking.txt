@@ -1,0 +1,24 @@
+
+   PASS  Tests\Feature\Tools\Accommodation\CreateHotelReservationToolTest
+  ✓ create reservation minimum payload                                   0.18s  
+  ✓ create reservation with services                                     0.11s  
+
+   PASS  Tests\Feature\Tools\Accommodation\HotelRoomAvailabilityToolTest
+  ✓ room availability with two rooms                                     0.17s  
+  ✓ room availability requires at least one room                         0.10s  
+
+   PASS  Tests\Feature\Tools\Booking\ConfirmBookingToolTest
+  ✓ confirm booking with valid booking id                                0.04s  
+  ✓ confirm booking with non existent booking id
+  ✓ confirm already confirmed booking                                    0.01s  
+
+   PASS  Tests\Feature\Tools\Booking\PrepareBookingToolTest
+  ✓ prepare booking with valid data                                      0.01s  
+  ✓ prepare booking with invalid credit card                             0.01s  
+  ✓ prepare booking with invalid card expiry
+  ✓ prepare booking for non bookable attraction
+  ✓ prepare booking for non existent attraction
+
+  Tests:    12 passed (30 assertions)
+  Duration: 0.72s
+
