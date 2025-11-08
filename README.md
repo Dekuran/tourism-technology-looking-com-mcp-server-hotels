@@ -71,7 +71,7 @@ Environment:
   - Override in your .env to point to your upstream (local or remote).
 
 Auth scaffolding:
-- This app does not ship with a runtime user model or auth routes. In case you later add one, [config/auth.php](config/auth.php) still references a model string via env('AUTH_MODEL'), which is safe even if no model exists. 
+- This app does not ship with a runtime user model or auth routes. In case you later add one, [config/auth.php](config/auth.php) still references a model string via env('AUTH_MODEL'), which is safe even if no model exists.  
 
 
 ## 4) Running Locally
