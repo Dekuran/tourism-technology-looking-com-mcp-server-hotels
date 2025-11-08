@@ -365,62 +365,10 @@ else
 fi
 add_md
 
-# Optional upstream CapCorn API smoke checks (if CAPCORN_BASE_URL provided)
-if [[ -n "${CAPCORN_BASE_URL:-}" ]]; then
-  hr
-  info "Performing upstream CapCorn API smoke checks for SearchRoomsTool and SearchRoomAvailabilityTool..."
-  add_md "## Tool Smoke Checks (via upstream CapCorn API)"
-  add_md
-  add_md "- CAPCORN_BASE_URL: ${CAPCORN_BASE_URL}"
-
-  # SearchRoomsTool smoke (rooms/search)
-  add_md "### SearchRoomsTool (rooms/search)"
-  SEARCH_JSON="$(cat <<JSON
-{
-  "language": "de",
-  "timespan": { "from": "${CAPCORN_SMOKE_TIMESPAN_FROM:-2025-11-20}", "to": "${CAPCORN_SMOKE_TIMESPAN_TO:-2025-11-25}" },
-  "duration": ${CAPCORN_SMOKE_DURATION:-2},
-  "adults": ${CAPCORN_SMOKE_ADULTS:-2}
-}
-JSON
-)"
-  SMOKE_OUT_SEARCH="${TMP_DIR}/capcorn_search.json"
-  set +e
-  HTTP_STATUS_SEARCH="$(curl -sS -m 25 -o "$SMOKE_OUT_SEARCH" -w '%{http_code}' -H 'Content-Type: application/json' -H 'Accept: application/json' -d "$SEARCH_JSON" "${CAPCORN_BASE_URL}/api/v1/rooms/search" || true)"
-  set -e
-  add_md "- HTTP Status: ${HTTP_STATUS_SEARCH}"
-  add_md "**Response (first 120 lines):**"
-  add_md_code "json" "$(head -n 120 "$SMOKE_OUT_SEARCH" || true)"
-  add_md
-
-  # SearchRoomAvailabilityTool smoke (rooms/availability)
-  add_md "### SearchRoomAvailabilityTool (rooms/availability)"
-  AVAIL_JSON="$(cat <<JSON
-{
-  "language": ${CAPCORN_SMOKE_LANG:-0},
-  "hotel_id": "${CAPCORN_HOTEL_ID:-HOTEL-EXAMPLE}",
-  "arrival": "${CAPCORN_SMOKE_ARRIVAL:-2025-11-20}",
-  "departure": "${CAPCORN_SMOKE_DEPARTURE:-2025-11-23}",
-  "rooms": [
-    {
-      "adults": ${CAPCORN_SMOKE_ROOM1_ADULTS:-2}
-    }
-  ]
-}
-JSON
-)"
-  SMOKE_OUT_AVAIL="${TMP_DIR}/capcorn_availability.json"
-  set +e
-  HTTP_STATUS_AVAIL="$(curl -sS -m 25 -o "$SMOKE_OUT_AVAIL" -w '%{http_code}' -H 'Content-Type: application/json' -H 'Accept: application/json' -d "$AVAIL_JSON" "${CAPCORN_BASE_URL}/api/v1/rooms/availability" || true)"
-  set -e
-  add_md "- HTTP Status: ${HTTP_STATUS_AVAIL}"
-  add_md "**Response (first 120 lines):**"
-  add_md_code "json" "$(head -n 120 "$SMOKE_OUT_AVAIL" || true)"
-else
-  add_md "## Tool Smoke Checks (via upstream CapCorn API)"
-  add_md
-  add_md "_Skipped — set CAPCORN_BASE_URL to enable upstream smoke checks for SearchRoomsTool and SearchRoomAvailabilityTool._"
-fi
+# Tool Execution Policy
+add_md "## Tool Execution Policy"
+add_md
+add_md "_This verification runs exclusively through the MCP server endpoint and its metadata (inspector + AI Agent View). Direct calls to the upstream CapCorn REST API are disabled to ensure testing only exercises our MCP tools._"
 add_md
 
 # Run tests
