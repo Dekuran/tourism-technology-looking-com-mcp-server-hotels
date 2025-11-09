@@ -257,3 +257,102 @@ Public endpoints:
 - CI/CD: [.github/workflows/deploy-cloudrun.yml](.github/workflows/deploy-cloudrun.yml)
 - Scripts: [scripts/run_mcp_tests.sh](scripts/run_mcp_tests.sh), [scripts/run_cloudrun_checks.sh](scripts/run_cloudrun_checks.sh), [scripts/start_mcp_server.sh](scripts/start_mcp_server.sh)
 - Reports: [reports/](reports/)
+
+## 11) Connect from Claude and OpenAI GPT (MCP)
+
+This server exposes a web-transport MCP endpoint at:
+- MCP Server (POST): https://mcp-hotel-server-336151914785.europe-west1.run.app/mcp/capcorn
+- Metadata (GET): https://mcp-hotel-server-336151914785.europe-west1.run.app/mcp/capcorn/meta
+
+The metadata route lists the server name/version, instructions, and registered tools. You can verify locally by running:
+```bash
+php artisan serve
+# POST http://localhost:8000/mcp/capcorn
+# GET  http://localhost:8000/mcp/capcorn/meta
+```
+
+### A) Connect from Claude (Desktop/Web) via the MCP Connector
+Claude Desktop supports MCP servers via its built-in MCP Connector.
+
+Docs:
+- Claude MCP Connector: https://docs.claude.com/en/docs/agents-and-tools/mcp-connector
+
+Steps (Desktop):
+1) Install Claude Desktop (macOS/Windows).
+2) Open Settings → “MCP Servers” (or edit the Claude Desktop config file if you prefer JSON).
+3) Add a new HTTP MCP server pointing to your publicly reachable URL:
+   - Name: capcorn
+   - URL (server): https://mcp-hotel-server-336151914785.europe-west1.run.app/mcp/capcorn
+   - Metadata URL (optional but recommended): https://mcp-hotel-server-336151914785.europe-west1.run.app/mcp/capcorn/meta
+4) Save and restart Claude Desktop if prompted. Claude will discover and list the exposed tools. You can now ask Claude to use these tools (e.g., “Search room availability for …”).
+
+If you need auth headers (e.g., when fronting via a proxy) add them in the connector UI (or config JSON). The connector sends them on each request.
+
+Token limits in Claude:
+- Output tokens: In Claude API, set max_output_tokens per request (e.g., 512–1024). In Desktop, limits are tied to the model/prompt settings; keep tool outputs concise so the assistant stays within budget.
+- Input tokens: Keep system/instructions short and tool responses compact. Large tool outputs directly increase input token usage on follow‑ups.
+
+Recommended defaults
+- Tool outputs: Aim for ~1–2k characters per call. Use bullet lists, avoid excessive prose.
+- For expensive searches, prefer summarizing top results and include a “use this tool again with X to fetch more” hint.
+
+### B) Connect from OpenAI GPT
+
+OpenAI support for MCP is evolving. There are two common ways to integrate today:
+
+Option 1 — Native MCP Connector (if available in your GPT workspace)
+- In the GPT (ChatGPT) builder UI, if “Add MCP server” or “MCP connectors” is available, add a new HTTP MCP server:
+  - Name: capcorn
+  - Server URL: https://mcp-hotel-server-336151914785.europe-west1.run.app/mcp/capcorn
+  - (Optional) Metadata URL: https://mcp-hotel-server-336151914785.europe-west1.run.app/mcp/capcorn/meta
+- The GPT will discover tools and their schemas and can call them during chats.
+
+Option 2 — Use an external MCP client/relay with OpenAI
+- Run a small MCP client relay that connects to this HTTP server and exposes callable functions to OpenAI (Assistants/Responses API).
+- Reference implementations:
+  - MCP Inspector (great for testing): https://github.com/modelcontextprotocol/inspector
+  - MCP JS client SDK (for building relays): https://github.com/modelcontextprotocol/typescript-sdk
+- Your relay maps MCP tools to OpenAI “tools”/“functions” and forwards calls to https://YOUR_SERVICE_URL/mcp/capcorn, returning the tool results back into the OpenAI conversation.
+
+OpenAI token limits
+- Output tokens: Use the model’s max_tokens (or similar) parameter for each run (e.g., 512–1024 for tool results and explanations).
+- Input tokens: Keep tool responses small, chunk large outputs, and consider streaming summarized results if your relay supports it.
+
+### C) Example: Claude Desktop JSON (advanced users)
+Some Claude Desktop builds allow JSON config for MCP servers. Below is an example sketch for an HTTP server. Your exact schema may differ depending on version; consult the official docs above.
+
+```jsonc
+{
+  "mcpServers": {
+    "capcorn": {
+      "transport": {
+        "type": "http",
+        "url": "https://mcp-hotel-server-336151914785.europe-west1.run.app/mcp/capcorn"
+      },
+      // Optional: metadata helps tools appear with rich descriptions
+      "metadataUrl": "https://mcp-hotel-server-336151914785.europe-west1.run.app/mcp/capcorn/meta",
+      // Optional headers if you front with a proxy or require auth
+      "headers": {
+        // "Authorization": "Bearer YOUR_TOKEN"
+      },
+      // Optional: network timeouts
+      "timeoutMs": 30000
+    }
+  }
+}
+```
+
+Notes
+- If you connect to a local server (http://localhost:8000/mcp/capcorn), keep Claude Desktop and the server on the same machine or ensure routing is configured.
+- For production, serve via HTTPS. Cloud Run deployments already expose a public HTTPS URL.
+
+### D) Best practices for MCP usage with LLMs
+- Make tools single‑purpose and idempotent. The LLM can chain steps when needed.
+- Always validate inputs in tools; return actionable errors (e.g., which field and expected format).
+- Keep tool results short, structured, and deterministic. Favor lists/tables; include next‑step guidance if results are truncated.
+- Document tool parameters and units in the tool description. Your [class CapCornServer extends Server](app/Mcp/CapCornServer/CapCornServer.php:10) “instructions” field should contain end‑user guidance consistent with tool behavior.
+- Use the /meta route to verify the tool inventory in remote environments (e.g., Cloud Run).
+- Token budgeting guidelines:
+  - Output tokens (assistant): 512–1024 for most steps is a good default.
+  - Input tokens (context): Keep instructions under ~2–3k tokens; keep tool outputs under ~1–2k characters whenever possible.
+  - For large datasets, paginate at the tool layer and let the assistant request more.
